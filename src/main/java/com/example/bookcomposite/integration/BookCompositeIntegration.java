@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
@@ -36,8 +37,9 @@ public class BookCompositeIntegration {
         try {
             Book[] books = restTemplate.getForObject(bookServiceUrl, Book[].class);
             return books != null ? Arrays.asList(books) : Collections.emptyList();
-        } catch (HttpClientErrorException e) {
-            throw e;
+        } catch (RestClientException e) {
+            // Any error fetching the list → return empty
+            return Collections.emptyList();
         }
     }
 
@@ -48,6 +50,10 @@ public class BookCompositeIntegration {
                     Book.class
             );
         } catch (HttpClientErrorException.NotFound nf) {
+            // 404 → no such book
+            return null;
+        } catch (RestClientException e) {
+            // other errors → treat as not found
             return null;
         }
     }
@@ -56,18 +62,17 @@ public class BookCompositeIntegration {
         try {
             Recommendation[] recs = restTemplate.getForObject(
                     recommendationServiceUrl + "?productId=" + bookId,
-                    Recommendation[].class);
+                    Recommendation[].class
+            );
             if (recs == null) {
                 return Collections.emptyList();
             }
             return Arrays.stream(recs)
                     .filter(r -> r.getProductId().equals(bookId))
                     .collect(Collectors.toList());
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                return Collections.emptyList();
-            }
-            throw e;
+        } catch (RestClientException e) {
+            // any 4xx/5xx or network error → no recommendations
+            return Collections.emptyList();
         }
     }
 
@@ -75,15 +80,12 @@ public class BookCompositeIntegration {
         try {
             Review[] revs = restTemplate.getForObject(
                     reviewServiceUrl + "/" + bookId,
-                    Review[].class);
-            return revs != null
-                    ? Arrays.asList(revs)
-                    : Collections.emptyList();
-        } catch (HttpClientErrorException e) {
-            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
-                return Collections.emptyList();
-            }
-            throw e;
+                    Review[].class
+            );
+            return revs != null ? Arrays.asList(revs) : Collections.emptyList();
+        } catch (RestClientException e) {
+            // any error (502, 404, etc.) → no reviews
+            return Collections.emptyList();
         }
     }
 }
