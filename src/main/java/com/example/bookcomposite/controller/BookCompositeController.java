@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/book-aggregates")
+@CrossOrigin(origins = "http://localhost:5173")
 public class BookCompositeController {
 
     private final BookCompositeIntegration integration;
